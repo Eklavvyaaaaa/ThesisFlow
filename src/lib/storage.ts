@@ -26,4 +26,5 @@ export const STORAGE_KEYS = {
     SAVED_SEARCHES: 'vc_saved_searches',
     NOTES_PREFIX: 'vc_notes_',
     CACHED_ENRICHMENT_PREFIX: 'vc_enrich_',
+    SAVED_COMPANIES: 'vc_saved_companies',
 };

@@ -28,6 +28,8 @@ export interface EnrichmentData {
     url: string;
     timestamp: string;
   }[];
+  timestamp: string;
+  isSimulated?: boolean;
 }
 
 export interface CompanyList {

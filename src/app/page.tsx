@@ -8,127 +8,163 @@ import {
   ArrowRight,
   TrendingUp,
   Clock,
-  Plus
+  Plus,
+  ArrowUpRight,
+  Sparkles
 } from 'lucide-react';
 
 export default function Home() {
   return (
-    <div className="max-w-6xl mx-auto space-y-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-200">
-        <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Intelligence Dashboard</h1>
-          <p className="text-slate-500 mt-2 text-lg">Welcome back. Discovery engine is live and monitoring 500+ signals.</p>
+    <div className="max-w-7xl mx-auto space-y-12 pb-20 px-4">
+      {/* Hero / Welcome */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100/50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider">
+            <Sparkles className="h-3 w-3" />
+            Intelligence Engine Active
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
+            Discover your next <span className="text-indigo-600">outlier.</span>
+          </h1>
+          <p className="text-slate-500 text-lg max-w-xl">
+            Real-time signals and AI-powered enrichment for the modern venture team.
+          </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-4">
           <Link
             href="/companies"
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-500 hover:-translate-y-0.5 transition-all"
+            className="group inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-4 text-sm font-bold text-white premium-transition hover:bg-slate-800 hover:-translate-y-1"
           >
-            Start Discovery
-            <ArrowRight className="h-4 w-4" />
+            Start Research
+            <ArrowRight className="h-4 w-4 group-hover:translate-x-1 premium-transition" />
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 mb-4">
-            <Building2 className="h-6 w-6" />
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="bg-white/50 backdrop-blur-sm p-8 rounded-[2rem] border border-slate-200/60 premium-transition hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 group">
+          <div className="flex items-center justify-between mb-6">
+            <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white premium-transition">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg">
+              <TrendingUp className="h-3 w-3" />
+              +12%
+            </span>
           </div>
-          <h3 className="text-slate-500 text-sm font-semibold uppercase tracking-wider">Total Companies</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-1">1,284</p>
-          <div className="mt-4 flex items-center text-xs text-emerald-600 font-bold">
-            <TrendingUp className="h-3 w-3 mr-1" />
-            +12% from last month
-          </div>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Total Universe</p>
+          <p className="text-4xl font-bold text-slate-900 mt-2">1,284</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 mb-4">
-            <Zap className="h-6 w-6" />
+        <div className="bg-white/50 backdrop-blur-sm p-8 rounded-[2rem] border border-slate-200/60 premium-transition hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 group">
+          <div className="flex items-center justify-between mb-6">
+            <div className="h-12 w-12 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-600 group-hover:bg-violet-600 group-hover:text-white premium-transition">
+              <Zap className="h-6 w-6" />
+            </div>
+            <span className="text-xs font-bold text-violet-600 flex items-center gap-1 bg-violet-50 px-2 py-1 rounded-lg">
+              <Clock className="h-3 w-3" />
+              Live
+            </span>
           </div>
-          <h3 className="text-slate-500 text-sm font-semibold uppercase tracking-wider">Enrichments Run</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-1">452</p>
-          <div className="mt-4 flex items-center text-xs text-indigo-600 font-bold">
-            <Clock className="h-3 w-3 mr-1" />
-            84 this week
-          </div>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Enrichments Run</p>
+          <p className="text-4xl font-bold text-slate-900 mt-2">452</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4">
-            <ListTodo className="h-6 w-6" />
+        <div className="bg-white/50 backdrop-blur-sm p-8 rounded-[2rem] border border-slate-200/60 premium-transition hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 group">
+          <div className="flex items-center justify-between mb-6">
+            <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-600 group-hover:text-white premium-transition">
+              <ListTodo className="h-6 w-6" />
+            </div>
           </div>
-          <h3 className="text-slate-500 text-sm font-semibold uppercase tracking-wider">Active Lists</h3>
-          <p className="text-3xl font-bold text-slate-900 mt-1">18</p>
-          <div className="mt-4 flex items-center text-xs text-slate-400 font-bold">
-            4 shared with team
-          </div>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Active Pipelenes</p>
+          <p className="text-4xl font-bold text-slate-900 mt-2">18</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Recent Activity</h2>
-            <Link href="/companies" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">View all</Link>
+      {/* Detailed Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 pt-4">
+        {/* Activity Feed */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-xl font-bold text-slate-900">Recent Signals</h2>
+            <Link href="/companies" className="text-sm font-bold text-indigo-600 hover:underline underline-offset-4">
+              Explore All Signals
+            </Link>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-sm">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                    <Building2 className="h-4 w-4" />
+          <div className="bg-white/40 border border-slate-200/50 rounded-[2rem] overflow-hidden backdrop-blur-sm">
+            {[
+              { id: 1, text: 'New company discovered in AgriTech', sub: 'TerraForma Labs • Nairobi', time: '2m ago' },
+              { id: 2, text: 'Enrichment complete for QuantumScale', sub: 'Detected hiring surge in London', time: '1h ago' },
+              { id: 3, text: 'Veridia AI moved to "Due Diligence"', sub: 'Updated by Alex Chen', time: '3h ago' },
+              { id: 4, text: 'Sector alert: HealthTech', sub: '4 new Seed rounds detected today', time: '5h ago' },
+            ].map((i) => (
+              <div key={i.id} className="group p-6 flex items-center justify-between hover:bg-white/80 premium-transition border-b border-slate-100 last:border-0">
+                <div className="flex items-center gap-5">
+                  <div className="h-10 w-10 rounded-xl bg-slate-100/50 flex items-center justify-center group-hover:bg-white premium-transition">
+                    <Building2 className="h-5 w-5 text-slate-400 group-hover:text-indigo-600 premium-transition" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-900">New company added to "AI Thesis"</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">Veridia AI • 2 hours ago</p>
+                    <h4 className="text-sm font-bold text-slate-900">{i.text}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5 font-medium">{i.sub}</p>
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-slate-300" />
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{i.time}</span>
+                  <div className="h-8 w-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 premium-transition bg-indigo-50 text-indigo-600">
+                    <ArrowUpRight className="h-4 w-4" />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900">Quick Actions</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Quick Tools */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-slate-900 px-2">Quick Actions</h2>
+          <div className="space-y-4">
             <Link
               href="/companies"
-              className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-all group"
+              className="flex items-center gap-4 p-6 bg-white border border-slate-200/60 rounded-[2rem] premium-transition hover:border-indigo-300 hover:shadow-lg group"
             >
-              <div className="h-8 w-8 rounded bg-slate-50 flex items-center justify-center mb-4 group-hover:bg-indigo-50 transition-colors">
-                <Search className="h-4 w-4 text-slate-600 group-hover:text-indigo-600" />
+              <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white premium-transition">
+                <Search className="h-5 w-5" />
               </div>
-              <h4 className="font-bold text-slate-900">Search Startups</h4>
-              <p className="text-xs text-slate-500 mt-1">Filter by sector, stage, and location.</p>
+              <div>
+                <h4 className="font-bold text-sm text-slate-900">Run Filters</h4>
+                <p className="text-xs text-slate-500">Segment universe</p>
+              </div>
             </Link>
+
             <Link
               href="/lists"
-              className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-all group"
+              className="flex items-center gap-4 p-6 bg-white border border-slate-200/60 rounded-[2rem] premium-transition hover:border-indigo-300 hover:shadow-lg group"
             >
-              <div className="h-8 w-8 rounded bg-slate-50 flex items-center justify-center mb-4 group-hover:bg-indigo-50 transition-colors">
-                <Plus className="h-4 w-4 text-slate-600 group-hover:text-indigo-600" />
+              <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white premium-transition">
+                <Plus className="h-5 w-5" />
               </div>
-              <h4 className="font-bold text-slate-900">Create List</h4>
-              <p className="text-xs text-slate-500 mt-1">Organize your pipeline effectively.</p>
+              <div>
+                <h4 className="font-bold text-sm text-slate-900">Create Pipeline</h4>
+                <p className="text-xs text-slate-500">Sync with colleagues</p>
+              </div>
             </Link>
-          </div>
-          <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl p-8 text-white relative overflow-hidden">
-            <div className="relative z-10">
-              <h3 className="text-xl font-bold">Try AI Enrichment</h3>
-              <p className="text-indigo-100 text-sm mt-2 max-w-[240px]">Deeply analyze startup websites using our proprietary LLM signal extraction.</p>
-              <Link
-                href="/companies"
-                className="inline-flex items-center mt-6 text-sm font-bold bg-white text-indigo-600 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all"
-              >
-                Launch Discovery
-              </Link>
+
+            <div className="p-8 rounded-[2rem] bg-indigo-600 text-white relative overflow-hidden group shadow-2xl shadow-indigo-200">
+              <div className="relative z-10">
+                <h3 className="text-lg font-bold">Deep Enrichment</h3>
+                <p className="text-indigo-100 text-xs mt-2 leading-relaxed">
+                  Extract precision signals from any URL using the Antigravity AI engine.
+                </p>
+                <Link
+                  href="/companies"
+                  className="inline-flex items-center mt-6 text-xs font-bold bg-white text-indigo-600 px-5 py-2.5 rounded-xl hover:scale-105 premium-transition"
+                >
+                  Start Discovery
+                </Link>
+              </div>
+              <Zap className="absolute -right-4 -bottom-4 h-32 w-32 text-indigo-400/20 rotate-12 group-hover:scale-110 premium-transition" />
             </div>
-            <Zap className="absolute -right-4 -bottom-4 h-32 w-32 text-white/10 rotate-12" />
           </div>
         </div>
       </div>

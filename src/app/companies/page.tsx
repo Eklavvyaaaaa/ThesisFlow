@@ -10,7 +10,9 @@ import {
     ArrowUpDown,
     ExternalLink,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    SlidersHorizontal,
+    Globe
 } from 'lucide-react';
 import { MOCK_COMPANIES } from '@/lib/data';
 import { Company, CompanyStage } from '@/types';
@@ -56,103 +58,114 @@ export default function CompaniesPage() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Discover Companies</h1>
-                    <p className="text-slate-500">Search and filter through {MOCK_COMPANIES.length} startup profiles.</p>
+        <div className="max-w-7xl mx-auto space-y-10 pb-20 px-4">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Universe Discovery</h1>
+                    <p className="text-slate-500 text-sm font-medium">Monitoring {MOCK_COMPANIES.length} high-signal startups across all sectors.</p>
                 </div>
-                <button className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 active:scale-95 transition-all">
+                <button className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white premium-transition shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:-translate-y-0.5 active:scale-95">
                     <Plus className="h-4 w-4" />
-                    Add Company
+                    New Company
                 </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 border-y border-slate-200 py-4">
-                <div className="relative flex-1 min-w-[240px]">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            {/* Filter Bar */}
+            <div className="bg-white p-2 rounded-[1.5rem] border border-slate-200 flex flex-col md:flex-row items-center gap-2 subtle-shadow">
+                <div className="relative flex-1 w-full">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Search by name or description..."
-                        className="w-full rounded-md border-slate-200 pl-10 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="Search by name, website, or keywords..."
+                        className="w-full bg-transparent border-none py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-0"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sector</span>
+                <div className="h-8 w-[1px] bg-slate-100 hidden md:block" />
+
+                <div className="flex items-center gap-2 px-2 w-full md:w-auto">
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400 ml-2" />
                     <select
-                        className="rounded-md border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="bg-transparent border-none text-xs font-bold text-slate-600 focus:ring-0 cursor-pointer min-w-[120px]"
                         value={sectorFilter}
                         onChange={(e) => setSectorFilter(e.target.value)}
                     >
-                        {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+                        {sectors.map(s => <option key={s} value={s}>{s === 'All' ? 'All Sectors' : s}</option>)}
                     </select>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Stage</span>
+                <div className="h-8 w-[1px] bg-slate-100 hidden md:block" />
+
+                <div className="flex items-center gap-2 px-2 w-full md:w-auto pr-4">
                     <select
-                        className="rounded-md border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="bg-transparent border-none text-xs font-bold text-slate-600 focus:ring-0 cursor-pointer min-w-[120px]"
                         value={stageFilter}
                         onChange={(e) => setStageFilter(e.target.value)}
                     >
-                        {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                        {stages.map(s => <option key={s} value={s}>{s === 'All' ? 'All Stages' : s}</option>)}
                     </select>
                 </div>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
-                        <tr>
+            {/* Data Table */}
+            <div className="bg-white/50 backdrop-blur-sm rounded-[2rem] border border-slate-200 overflow-hidden subtle-shadow">
+                <table className="min-w-full divide-y divide-slate-100">
+                    <thead>
+                        <tr className="bg-slate-50/50">
                             <th
-                                className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:text-slate-900"
+                                className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 cursor-pointer hover:text-indigo-600 transition-colors"
                                 onClick={() => requestSort('name')}
                             >
-                                <div className="flex items-center gap-1">
-                                    Name <ArrowUpDown className="h-3 w-3" />
+                                <div className="flex items-center gap-2">
+                                    Entity <ArrowUpDown className="h-3 w-3" />
                                 </div>
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Sector</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Stage</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Location</th>
-                            <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                            <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Sector</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Stage</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Location</th>
+                            <th className="relative px-8 py-5"><span className="sr-only">Actions</span></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
+                    <tbody className="divide-y divide-slate-50">
                         {filteredCompanies.length > 0 ? (
                             filteredCompanies.map((company) => (
-                                <tr key={company.id} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="whitespace-nowrap px-6 py-4">
+                                <tr key={company.id} className="hover:bg-indigo-50/30 transition-all group">
+                                    <td className="px-8 py-5">
                                         <Link href={`/companies/${company.id}`} className="flex flex-col">
-                                            <span className="text-sm font-semibold text-indigo-600 group-hover:underline underline-offset-2">
+                                            <span className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 premium-transition">
                                                 {company.name}
                                             </span>
-                                            <span className="text-xs text-slate-400">{company.website}</span>
+                                            <span className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                                                <Globe className="h-3 w-3" />
+                                                {company.website.replace('https://', '')}
+                                            </span>
                                         </Link>
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
-                                        {company.sector}
+                                    <td className="px-8 py-5">
+                                        <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
+                                            {company.sector}
+                                        </span>
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4">
+                                    <td className="px-8 py-5">
                                         <span className={cn(
-                                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                                            company.stage === 'Seed' ? "bg-emerald-100 text-emerald-800" :
-                                                company.stage.startsWith('Series') ? "bg-blue-100 text-blue-800" :
-                                                    "bg-amber-100 text-amber-800"
+                                            "inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold",
+                                            company.stage === 'Seed' ? "bg-emerald-50 text-emerald-700" :
+                                                company.stage.startsWith('Series') ? "bg-indigo-50 text-indigo-700" :
+                                                    "bg-amber-50 text-amber-700"
                                         )}>
                                             {company.stage}
                                         </span>
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                                    <td className="px-8 py-5 text-xs font-medium text-slate-500">
                                         {company.location}
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                                    <td className="px-8 py-5 text-right">
                                         <Link
                                             href={`/companies/${company.id}`}
-                                            className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 hover:bg-white hover:text-indigo-600 hover:shadow-lg premium-transition active:scale-95"
                                         >
                                             <ChevronRight className="h-5 w-5" />
                                         </Link>
@@ -161,13 +174,15 @@ export default function CompaniesPage() {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <div className="rounded-full bg-slate-100 p-3">
-                                            <Search className="h-6 w-6 text-slate-400" />
+                                <td colSpan={5} className="px-8 py-20 text-center">
+                                    <div className="flex flex-col items-center gap-4 max-w-xs mx-auto">
+                                        <div className="h-16 w-16 rounded-[1.5rem] bg-slate-50 flex items-center justify-center">
+                                            <Search className="h-8 w-8 text-slate-200" />
                                         </div>
-                                        <p className="text-lg font-medium">No companies found</p>
-                                        <p className="text-sm">Try adjusting your filters or search query.</p>
+                                        <div className="space-y-1">
+                                            <p className="text-lg font-bold text-slate-900">No entities found</p>
+                                            <p className="text-sm text-slate-500 font-medium">Try broadening your search or resetting filters to find matching companies.</p>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -176,15 +191,16 @@ export default function CompaniesPage() {
                 </table>
             </div>
 
-            <div className="flex items-center justify-between py-3">
-                <p className="text-sm text-slate-700">
-                    Showing <span className="font-medium">{filteredCompanies.length}</span> results
+            {/* Pagination / Footer */}
+            <div className="flex items-center justify-between pt-4">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Showing <span className="text-slate-900">{filteredCompanies.length}</span> of {MOCK_COMPANIES.length} Entities
                 </p>
-                <div className="flex gap-2">
-                    <button className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled>
+                <div className="flex gap-3">
+                    <button className="rounded-xl border border-slate-200 px-5 py-2 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-900 premium-transition disabled:opacity-30 subtle-shadow" disabled>
                         Previous
                     </button>
-                    <button className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    <button className="rounded-xl border border-slate-200 px-5 py-2 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-900 premium-transition subtle-shadow">
                         Next
                     </button>
                 </div>
