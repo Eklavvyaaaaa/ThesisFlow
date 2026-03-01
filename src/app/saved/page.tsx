@@ -2,16 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-    Search,
-    Clock,
-    ArrowRight,
-    Trash2,
     Play,
-    Filter,
-    ExternalLink,
-    Terminal,
-    MapPin,
-    Zap
+    Trash2
 } from 'lucide-react';
 import { getFromStorage, setToStorage, STORAGE_KEYS } from '@/lib/storage';
 import { SavedSearch } from '@/types';
@@ -23,7 +15,7 @@ export default function SavedSearchesPage() {
 
     useEffect(() => {
         const saved = getFromStorage<SavedSearch[]>(STORAGE_KEYS.SAVED_SEARCHES, []);
-        setSavedSearches(saved);
+        setTimeout(() => setSavedSearches(saved), 0);
     }, []);
 
     const deleteSearch = (id: string) => {
@@ -33,71 +25,55 @@ export default function SavedSearchesPage() {
     };
 
     return (
-        <div className="space-y-10 pb-20">
+        <div className="space-y-8 pb-16">
             {/* Header */}
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">Saved Queries</h1>
-                <p className="text-sm text-neutral-muted">Reusable discovery filters and automated signals.</p>
+            <div>
+                <h1 className="font-display text-[28px] text-primary tracking-tight">Saved Searches</h1>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
+            <div className="flex flex-col gap-0 border-t border-default">
                 {savedSearches.length > 0 ? (
-                    savedSearches.map((search) => (
-                        <div key={search.id} className="content-card flex items-center justify-between hover:border-primary-border transition-all group">
-                            <div className="flex items-center gap-6">
-                                <div className="h-10 w-10 rounded-xl bg-neutral-soft border border-neutral-border flex items-center justify-center text-neutral-muted group-hover:text-primary-foreground group-hover:border-primary-border transition-all">
-                                    <Terminal className="h-4 w-4" />
-                                </div>
+                    savedSearches.map((search) => {
+                        const filterSummary = Object.entries(search.filters)
+                            .filter(([_, value]) => value && value !== 'All')
+                            .map(([key, value]) => `${key.charAt(0).toUpperCase() + key.slice(1)}: ${value}`)
+                            .join(' · ');
+
+                        return (
+                            <div key={search.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-default hover:bg-subtle transition-editorial group">
                                 <div className="space-y-1">
-                                    <h3 className="text-sm font-bold text-foreground">{search.name}</h3>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1.5">
-                                            {Object.entries(search.filters).map(([key, value]) => value && (
-                                                <span key={key} className="bg-neutral-soft text-neutral-muted px-2 py-0.5 rounded text-[10px] font-bold border border-neutral-border uppercase tracking-tight">
-                                                    {key}: {value}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="h-3 w-[1px] bg-neutral-border" />
-                                        <span className="text-[10px] font-bold text-neutral-muted uppercase tracking-widest flex items-center gap-1">
-                                            <Clock className="h-2.5 w-2.5" />
-                                            {new Date(search.createdAt).toLocaleDateString()}
-                                        </span>
-                                    </div>
+                                    <h3 className="text-[14px] font-semibold text-primary">{search.name}</h3>
+                                    <p className="font-mono text-[12px] text-muted">
+                                        {filterSummary || "No filters applied"}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-4 mt-3 sm:mt-0">
+                                    <Link
+                                        href={`/companies?${new URLSearchParams(search.filters as Record<string, string>).toString()}`}
+                                        className="btn-ghost text-[14px] shadow-sm bg-card border border-default hover:border-strong"
+                                    >
+                                        Run Search <span className="ml-1 font-mono text-[11px]">→</span>
+                                    </Link>
+                                    <button
+                                        onClick={() => deleteSearch(search.id)}
+                                        title="Delete Query"
+                                        className="p-1.5 text-muted hover:text-red-600 transition-editorial bg-transparent"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <Link
-                                    href={`/companies?${new URLSearchParams(search.filters as Record<string, string>).toString()}`}
-                                    className="btn-secondary py-1.5 px-4 text-[11px] font-bold flex items-center gap-2 group/btn"
-                                >
-                                    <Play className="h-3 w-3 fill-neutral-muted group-hover/btn:fill-foreground transition-all" />
-                                    Execute
-                                </Link>
-                                <button
-                                    onClick={() => deleteSearch(search.id)}
-                                    title="Delete Query"
-                                    className="p-2 text-neutral-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                        </div>
-                    ))
+                        );
+                    })
                 ) : (
-                    <div className="content-card border-dashed py-20 text-center space-y-6">
-                        <div className="h-16 w-16 rounded-full bg-neutral-soft mx-auto flex items-center justify-center">
-                            <Zap className="h-8 w-8 text-neutral-muted opacity-20" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-bold text-foreground">No saved queries</h3>
-                            <p className="text-xs text-neutral-muted max-w-sm mx-auto">Save your complex filters from the discovery hub to monitor new entities automatically.</p>
-                        </div>
+                    <div className="py-24 text-center border-b border-default space-y-4">
+                        <h3 className="font-display italic text-[24px] text-primary">No saved searches</h3>
+                        <p className="text-[15px] text-secondary max-w-sm mx-auto">Save your complex filters from the Companies view to reuse them instantly.</p>
                         <Link
                             href="/companies"
-                            className="btn-secondary py-2 px-8 text-[11px] font-bold uppercase tracking-widest"
+                            className="btn-primary inline-flex mt-2"
                         >
-                            Open Hub
+                            Explore Companies
                         </Link>
                     </div>
                 )}

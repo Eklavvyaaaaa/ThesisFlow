@@ -1,114 +1,100 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchAndCleanHtml } from '@/lib/scraper';
+import { NextResponse } from 'next/server';
+import Groq from 'groq-sdk';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.1-8b-instant';
-
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
     try {
-        const { website, companyName, companyDescription } = await req.json();
+        const body = await request.json();
+        const { url, companyId } = body;
 
-        if (!website) {
-            return NextResponse.json({ error: 'Website URL is required' }, { status: 400 });
+        // 2. Validate the URL
+        if (!url || typeof url !== 'string') {
+            return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
         }
 
-        const apiKey = process.env.GROQ_API_KEY;
-        if (!apiKey) {
-            console.error('GROQ_API_KEY is not configured');
-            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-        }
-
-        console.log(`Enriching: ${website} (${companyName || 'Unknown'})`);
-
-        // 1. Fetch and clean website content
-        let cleanedText = await fetchAndCleanHtml(website);
-        let isSimulated = false;
-
-        // Detect inaccessible or empty content
-        if (cleanedText.startsWith('[INACCESSIBLE:') || cleanedText === '[EMPTY CONTENT]') {
-            console.warn(`Scraper failed for ${website}. Falling back to simulation.`);
-            isSimulated = true;
-            cleanedText = `The website for ${companyName || 'this company'} is currently inaccessible. Use the available description to simulate a high-fidelity venture intelligence analysis: \n\n ${companyDescription || 'No description available.'}`;
-        }
-
-        // 2. Extract intelligence with Groq
-        const systemPrompt = `You are a venture capital intelligence analyst. Extract structured startup intelligence from text. 
-        
-        ${isSimulated ? 'NOTE: The provided text is a fallback description. Perform a "High-Fidelity Simulation" based on this context.' : 'Extract precision signals from the provided website content.'}
-        
-        Return strictly valid JSON only in this schema:
-        {
-          "summary": "1-2 sentence summary ${isSimulated ? '(labeled as intelligence projection)' : ''}",
-          "what_they_do": ["3-6 technical bullet points"],
-          "keywords": ["5-10 keywords"],
-          "derived_signals": ["2-4 inferred signals"]
-        }
-        
-        Do not include explanations outside JSON.`;
-
-        const groqResponse = await fetch(GROQ_API_URL, {
+        // 3. Use Firecrawl to scrape the company website
+        const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${process.env.FIRECRAWL_API_KEY}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: MODEL,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Context: ${cleanedText}` }
-                ],
-                temperature: 0.2,
-                response_format: { type: 'json_object' }
+                url: url,
+                formats: ['markdown'],
+                onlyMainContent: true
             })
         });
 
-        if (!groqResponse.ok) {
-            const errorData = await groqResponse.json();
-            console.error('Groq API error:', errorData);
-
-            if (groqResponse.status === 401) {
-                return NextResponse.json({ error: 'Invalid API configuration' }, { status: 500 });
-            }
-            if (groqResponse.status === 429) {
-                return NextResponse.json({ error: 'Rate limit exceeded. Please try again later.' }, { status: 429 });
-            }
-            throw new Error(`Groq API returned ${groqResponse.status}`);
+        if (!scrapeResponse.ok) {
+            return NextResponse.json({ error: 'Failed to scrape website' }, { status: 500 });
         }
 
-        const completion = await groqResponse.json();
-        const content = completion.choices[0]?.message?.content;
+        const scrapeData = await scrapeResponse.json();
+        const pageContent = scrapeData.data?.markdown || '';
 
-        if (!content) {
-            throw new Error('Empty response from Groq API');
+        if (!pageContent) {
+            return NextResponse.json({ error: 'No content found at URL' }, { status: 500 });
         }
 
-        // 3. Parse and structure the response
-        let extraction;
-        try {
-            extraction = JSON.parse(content);
-        } catch (parseError) {
-            console.error('JSON Parse error:', content);
-            return NextResponse.json({ error: 'Failed to parse AI intelligence' }, { status: 500 });
-        }
+        // 4. Send the scraped content to Groq using the groq SDK
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-        const structuredResponse = {
-            summary: extraction.summary || 'Summary unavailable',
-            whatTheyDo: extraction.what_they_do || [],
-            keywords: extraction.keywords || [],
-            derivedSignals: extraction.derived_signals || [],
-            sources: [
-                { url: website, timestamp: new Date().toISOString() }
+        const completion = await groq.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a VC analyst. Always respond with valid JSON only. No markdown, no explanation, no code blocks. Just raw JSON.'
+                },
+                {
+                    role: 'user',
+                    content: `Based on this company website content, extract and return ONLY this JSON structure:
+{
+  "summary": "1-2 sentence overview of what the company does",
+  "whatTheyDo": ["bullet point 1", "bullet point 2", "bullet point 3", "bullet point 4"],
+  "keywords": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "signals": ["signal inferred from content 1", "signal 2", "signal 3"]
+}
+
+Website content:
+${pageContent.slice(0, 6000)}`
+                }
             ],
-            timestamp: new Date().toISOString(),
-            isSimulated // Flag to indicate if this was a fallback result
-        };
+            response_format: { type: 'json_object' },
+            temperature: 0.3,
+            max_tokens: 1000,
+        });
 
-        return NextResponse.json(structuredResponse);
-    } catch (error) {
-        console.error('Enrichment error:', error);
+        // 5. Parse Groq's response safely
+        const rawText = completion.choices[0]?.message?.content || '';
+
+        let parsed;
+        try {
+            // Because we used response_format: 'json_object', it should be perfectly clean
+            parsed = JSON.parse(rawText);
+        } catch (e) {
+            console.error("Failed to parse Groq response:", rawText);
+            return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 });
+        }
+
+        // 6. Return the final response
         return NextResponse.json({
-            error: error instanceof Error ? error.message : 'Failed to enrich company data'
-        }, { status: 500 });
+            summary: parsed.summary || '',
+            whatTheyDo: parsed.whatTheyDo || [],
+            keywords: parsed.keywords || [],
+            signals: parsed.signals || [],
+            derivedSignals: parsed.signals || [], // Frontend expects derivedSignals for the timeline
+            timestamp: new Date().toISOString(), // Frontend strictly expects timestamp
+            sources: [
+                {
+                    url: url,
+                    scrapedAt: new Date().toISOString()
+                }
+            ]
+        });
+
+    } catch (error) {
+        // 7. Wrap everything in a try/catch
+        return NextResponse.json({ error: 'Enrichment failed' }, { status: 500 });
     }
 }

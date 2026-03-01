@@ -1,35 +1,57 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
-    Plus,
-    Search,
-    ChevronDown,
-    ArrowUpDown,
-    ChevronRight,
-    SlidersHorizontal,
-    Globe,
-    Building2,
-    CheckCircle2
+    MoreHorizontal,
+    Eye,
+    Bookmark,
+    RefreshCw
 } from 'lucide-react';
-import { MOCK_COMPANIES } from '@/lib/data';
 import { Company } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function CompaniesPage() {
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
     const [search, setSearch] = useState('');
     const [sectorFilter, setSectorFilter] = useState('All');
     const [stageFilter, setStageFilter] = useState('All');
     const [sortConfig, setSortConfig] = useState<{ key: keyof Company; direction: 'asc' | 'desc' } | null>(null);
+    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
-    const sectors = useMemo(() => ['All', ...new Set(MOCK_COMPANIES.map(c => c.sector))].sort(), []);
+    const loadCompanies = useCallback(async () => {
+        setLoading(true);
+        setError(false);
+        try {
+            const res = await fetch('/api/companies');
+            const data = await res.json();
+            if (data.companies && data.companies.length > 0) {
+                setCompanies(data.companies);
+            } else {
+                setError(true);
+            }
+        } catch (e) {
+            console.error(e);
+            setError(true);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadCompanies();
+    }, [loadCompanies]);
+
+    const sectors = useMemo(() => ['All', ...new Set(companies.map(c => c.sector))].sort(), [companies]);
     const stages = useMemo(() => ['All', 'Seed', 'Series A', 'Series B', 'Series C', 'Late Stage', 'Exit'], []);
 
     const filteredCompanies = useMemo(() => {
-        let result = MOCK_COMPANIES.filter(company => {
-            const matchesSearch = company.name.toLowerCase().includes(search.toLowerCase()) ||
-                company.description.toLowerCase().includes(search.toLowerCase());
+        let result = [...companies].filter(company => {
+            const matchesSearch = (company.name || '').toLowerCase().includes(search.toLowerCase()) ||
+                (company.description || '').toLowerCase().includes(search.toLowerCase());
             const matchesSector = sectorFilter === 'All' || company.sector === sectorFilter;
             const matchesStage = stageFilter === 'All' || company.stage === stageFilter;
             return matchesSearch && matchesSector && matchesStage;
@@ -46,7 +68,7 @@ export default function CompaniesPage() {
         }
 
         return result;
-    }, [search, sectorFilter, stageFilter, sortConfig]);
+    }, [companies, search, sectorFilter, stageFilter, sortConfig]);
 
     const requestSort = (key: keyof Company) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -56,125 +78,231 @@ export default function CompaniesPage() {
         setSortConfig({ key, direction });
     };
 
+    const toggleRow = (id: string) => {
+        const newSelected = new Set(selectedRows);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedRows(newSelected);
+    };
+
+    const toggleAll = () => {
+        if (selectedRows.size === filteredCompanies.length) {
+            setSelectedRows(new Set());
+        } else {
+            setSelectedRows(new Set(filteredCompanies.map(c => c.id)));
+        }
+    };
+
+    const getScoreColor = (score: number) => {
+        if (score >= 80) return 'text-[var(--color-score-high)]';
+        if (score >= 50) return 'text-[var(--color-score-mid)]';
+        return 'text-[var(--color-score-low)]';
+    };
+
+    // Helper to generate consistent fake scores since it's not in the mock DB yet
+    // Convert string ID to number for arithmetic, fallback to 1 if NaN
+    const getMockScore = (idStr: string) => {
+        const idNum = parseInt(idStr) || parseInt(idStr.substring(0, 8), 16) || 1;
+        return 40 + (idNum * 17) % 60;
+    };
+
     return (
-        <div className="space-y-10">
+        <div className="space-y-8 pb-20">
             {/* Header Area */}
-            <div className="flex items-end justify-between">
+            <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-black tracking-tight text-foreground">Universe Workspace</h1>
-                    <p className="text-sm text-neutral-muted font-medium">Venture Discovery • {MOCK_COMPANIES.length} Entities Tracked</p>
+                    <h1 className="font-display text-[28px] text-primary tracking-tight">Companies</h1>
+                    <p className="font-mono text-[12px] text-muted">{filteredCompanies.length} companies · last synced 2 min ago</p>
                 </div>
-                <button className="btn-primary flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Signal
+                <button onClick={loadCompanies} className="btn-ghost gap-2">
+                    <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                    Refresh
                 </button>
             </div>
 
-            {/* Filter Hub */}
-            <div className="flex flex-col md:flex-row items-center gap-4 bg-white border-[1.5px] border-neutral-border rounded-2xl p-1.5 shadow-sm">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-muted group-focus-within:text-primary-foreground transition-colors" />
-                    <input
-                        type="text"
-                        placeholder="Search entities, thesis, or founders..."
-                        className="w-full bg-transparent border-none py-3 pl-12 pr-4 text-sm focus:ring-0 placeholder:text-neutral-muted/50 font-medium"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+            {error && (
+                <div className="bg-subtle border border-default p-4 rounded-xl flex items-center justify-between animate-in fade-in">
+                    <span className="text-[14px] text-primary font-medium">Could not load companies from ProductHunt.</span>
+                    <button onClick={loadCompanies} className="text-[13px] bg-white border border-strong px-3 py-1.5 rounded-lg hover:border-black transition-editorial font-bold text-primary shadow-sm">
+                        Try again
+                    </button>
                 </div>
-                <div className="h-6 w-[1.5px] bg-neutral-border hidden md:block" />
-                <div className="flex items-center gap-2 pr-4">
-                    <div className="flex items-center gap-3 px-4 border-r-[1.5px] border-neutral-border">
-                        <span className="text-[10px] font-black text-neutral-muted uppercase tracking-[0.1em]">Sector</span>
+            )}
+
+            {/* Filter Bar */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    {/* Simplified pill selects for demo */}
+                    <div className="relative">
                         <select
-                            className="bg-transparent border-none text-xs font-black text-foreground focus:ring-0 cursor-pointer p-0 pr-8"
-                            value={sectorFilter}
-                            onChange={(e) => setSectorFilter(e.target.value)}
-                        >
-                            {sectors.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex items-center gap-3 px-4">
-                        <span className="text-[10px] font-black text-neutral-muted uppercase tracking-[0.1em]">Stage</span>
-                        <select
-                            className="bg-transparent border-none text-xs font-black text-foreground focus:ring-0 cursor-pointer p-0 pr-8"
+                            className={cn(
+                                "appearance-none bg-card border border-default rounded-full px-4 py-1.5 text-[13px] text-primary focus:outline-none focus:border-accent cursor-pointer pr-8 transition-editorial",
+                                stageFilter !== 'All' && "bg-[var(--color-accent-light)] border-[var(--color-accent)] text-[var(--color-accent)]"
+                            )}
                             value={stageFilter}
                             onChange={(e) => setStageFilter(e.target.value)}
                         >
-                            {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                            <option value="All">Stage</option>
+                            {stages.filter(s => s !== 'All').map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                            <svg className="h-3 w-3 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div className="relative">
+                        <select
+                            className={cn(
+                                "appearance-none bg-card border border-default rounded-full px-4 py-1.5 text-[13px] text-primary focus:outline-none focus:border-accent cursor-pointer pr-8 transition-editorial",
+                                sectorFilter !== 'All' && "bg-[var(--color-accent-light)] border-[var(--color-accent)] text-[var(--color-accent)]"
+                            )}
+                            value={sectorFilter}
+                            onChange={(e) => setSectorFilter(e.target.value)}
+                        >
+                            <option value="All">Sector</option>
+                            {sectors.filter(s => s !== 'All').map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                            <svg className="h-3 w-3 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
+
+                {(stageFilter !== 'All' || sectorFilter !== 'All') && (
+                    <button
+                        onClick={() => { setStageFilter('All'); setSectorFilter('All'); }}
+                        className="text-[13px] text-muted hover:text-primary transition-editorial"
+                    >
+                        Reset filters
+                    </button>
+                )}
             </div>
 
-            {/* Entity Table */}
-            <div className="border-[1.5px] border-neutral-border rounded-2xl bg-white overflow-hidden shadow-sm">
+            {/* Entity Table (No card wrapper, directly on bg) */}
+            <div className="w-full relative overflow-x-auto pb-4">
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="bg-neutral-soft/50 border-b-[1.5px] border-neutral-border">
-                            <th className="px-8 py-5">
-                                <button onClick={() => requestSort('name')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-neutral-muted hover:text-foreground transition-colors">
-                                    Entity <ArrowUpDown className="h-3 w-3" />
+                        <tr>
+                            <th className="py-3 px-2 border-b-2 border-default w-10">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-strong text-accent focus:ring-accent w-4 h-4 cursor-pointer"
+                                    checked={selectedRows.size === filteredCompanies.length && filteredCompanies.length > 0}
+                                    onChange={toggleAll}
+                                />
+                            </th>
+                            <th className="py-3 pr-4 border-b-2 border-default">
+                                <button onClick={() => requestSort('name')} className="text-[11px] uppercase tracking-wide text-muted font-medium flex items-center gap-1 group">
+                                    Company
+                                    {sortConfig?.key === 'name' && (
+                                        <span className="text-accent">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                                    )}
                                 </button>
                             </th>
-                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-wider text-neutral-muted">Core Sector</th>
-                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-wider text-neutral-muted">Maturity</th>
-                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-wider text-neutral-muted">Hub</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-wider text-neutral-muted">Signal</th>
+                            <th className="py-3 px-4 border-b-2 border-default text-[11px] uppercase tracking-wide text-muted font-medium">Sector</th>
+                            <th className="py-3 px-4 border-b-2 border-default text-[11px] uppercase tracking-wide text-muted font-medium">Stage</th>
+                            <th className="py-3 px-4 border-b-2 border-default text-[11px] uppercase tracking-wide text-muted font-medium text-right">Thesis Score</th>
+                            <th className="py-3 px-4 border-b-2 border-default text-[11px] uppercase tracking-wide text-muted font-medium text-right">Last Enriched</th>
+                            <th className="py-3 pl-4 border-b-2 border-default w-24"></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y-[1.5px] divide-neutral-border">
-                        {filteredCompanies.length > 0 ? (
-                            filteredCompanies.map((company) => (
-                                <tr key={company.id} className="hover:bg-primary/[0.02] transition-all group cursor-pointer">
-                                    <td className="px-6 py-5">
-                                        <Link href={`/companies/${company.id}`} className="flex items-center gap-4">
-                                            <div className="h-10 w-10 rounded-xl bg-neutral-soft border-[1.5px] border-neutral-border flex items-center justify-center font-black text-xs text-neutral-muted group-hover:border-primary-border group-hover:text-primary-foreground group-hover:shadow-sm transition-all shrink-0">
+                    <tbody>
+                        {loading ? (
+                            <>
+                                {[...Array(8)].map((_, i) => (
+                                    <tr key={i} className="border-b border-default h-[48px]">
+                                        <td className="px-2"><div className="w-4 h-4 bg-subtle rounded animate-pulse" /></td>
+                                        <td className="pr-4 py-2"><div className="h-4 w-3/4 bg-subtle rounded animate-pulse" /></td>
+                                        <td className="px-4 py-2"><div className="h-4 w-1/2 bg-subtle rounded animate-pulse" /></td>
+                                        <td className="px-4 py-2"><div className="h-4 w-16 bg-subtle rounded-full animate-pulse z-10" /></td>
+                                        <td className="px-4 py-2"><div className="h-4 w-8 bg-subtle rounded ml-auto animate-pulse" /></td>
+                                        <td className="px-4 py-2"><div className="h-4 w-12 bg-subtle rounded ml-auto animate-pulse" /></td>
+                                        <td className="pl-4 py-2"></td>
+                                    </tr>
+                                ))}
+                            </>
+                        ) : filteredCompanies.map((company) => {
+                            const isSelected = selectedRows.has(company.id);
+                            const score = getMockScore(company.id);
+
+                            return (
+                                <tr key={company.id} className="group hover:bg-subtle transition-editorial border-b border-default h-[48px]">
+                                    <td className="px-2">
+                                        <div className={cn("flex items-center justify-center opacity-100 transition-opacity", isSelected && "opacity-100")}>
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-strong text-accent focus:ring-accent w-4 h-4 cursor-pointer"
+                                                checked={isSelected}
+                                                onChange={() => toggleRow(company.id)}
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="pr-4 py-2">
+                                        <Link href={`/companies/${company.id}`} className="flex items-center gap-3">
+                                            <div className="h-4 w-4 rounded-sm bg-strong flex items-center justify-center text-[8px] font-bold text-white shrink-0">
                                                 {company.name[0]}
                                             </div>
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-[14px] font-black text-foreground group-hover:text-primary-foreground transition-colors tracking-tight truncate">{company.name}</span>
-                                                <span className="text-xs text-neutral-muted font-bold opacity-70 tracking-tight truncate">{company.website.replace('https://', '')}</span>
+                                            <div className="flex flex-col min-w-0 max-w-[240px]">
+                                                <span className="text-[14px] font-semibold text-primary truncate" title={company.name}>{company.name}</span>
+                                                <span className="text-[12px] text-muted truncate" title={company.website || ''}>{(company.website || '').replace('https://', '')}</span>
                                             </div>
                                         </Link>
                                     </td>
-                                    <td className="px-6 py-5">
-                                        <span className="bg-neutral-soft text-neutral-muted text-[10px] font-black px-2.5 py-1 rounded-lg border-[1.5px] border-neutral-border uppercase tracking-wider whitespace-nowrap">
+                                    <td className="px-4 py-2">
+                                        <span className="text-[13px] text-secondary">
                                             {company.sector}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-5">
+                                    <td className="px-4 py-2">
                                         <span className={cn(
-                                            "inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-black border-[1.5px] uppercase tracking-wider whitespace-nowrap",
-                                            company.stage === 'Seed' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                                                company.stage.startsWith('Series') ? "bg-primary text-primary-foreground border-primary-border" :
-                                                    "bg-neutral-soft text-neutral-muted border-neutral-border"
+                                            "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-mono border",
+                                            company.stage === 'Seed' ? "bg-[var(--color-amber-light)] text-[var(--color-amber)] border-[var(--color-amber-light)]" :
+                                                company.stage.startsWith('Series A') ? "bg-[var(--color-accent-light)] text-[var(--color-accent)] border-[var(--color-accent-light)]" :
+                                                    "bg-subtle text-muted border-default"
                                         )}>
                                             {company.stage}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-5 text-xs font-bold text-neutral-muted truncate max-w-[200px]">
-                                        {company.location}
+                                    <td className="px-4 py-2 text-right">
+                                        <span className={cn("font-mono text-[13px] font-bold", getScoreColor(score))}>
+                                            {score}
+                                        </span>
                                     </td>
-                                    <td className="px-6 py-5 text-right whitespace-nowrap">
-                                        <div className="flex items-center justify-end gap-2 text-emerald-600">
-                                            <CheckCircle2 className="h-4 w-4" />
-                                            <span className="text-[10px] font-black uppercase tracking-tight">Verified</span>
+                                    <td className="px-4 py-2 text-right">
+                                        <span className="font-mono text-[12px] text-muted">
+                                            {selectedRows.size % 3 === 0 ? 'Never' : `${company.id.length % 5 + 1}d ago`}
+                                        </span>
+                                    </td>
+                                    <td className="pl-4 py-2 text-right">
+                                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button className="p-1.5 text-secondary hover:text-primary hover:bg-black/5 rounded transition-editorial">
+                                                <Eye className="h-4 w-4" />
+                                            </button>
+                                            <button className="p-1.5 text-secondary hover:text-primary hover:bg-black/5 rounded transition-editorial">
+                                                <Bookmark className="h-4 w-4" />
+                                            </button>
+                                            <button className="p-1.5 text-secondary hover:text-primary hover:bg-black/5 rounded transition-editorial">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
-                            ))
-                        ) : (
+                            );
+                        })}
+                        {!loading && filteredCompanies.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="py-24 text-center">
-                                    <div className="flex flex-col items-center gap-6 text-neutral-muted">
-                                        <div className="h-20 w-20 rounded-full bg-neutral-soft flex items-center justify-center border-[1.5px] border-neutral-border shadow-inner">
-                                            <Search className="h-8 w-8 opacity-20" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm font-black text-foreground">No matching entities tracked</p>
-                                            <p className="text-xs font-bold max-w-xs mx-auto">Try refining your thesis filters or discovery keywords.</p>
-                                        </div>
+                                <td colSpan={7} className="py-16 text-center">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <h3 className="font-display italic text-2xl text-primary">No companies found</h3>
+                                        <p className="text-[14px] text-secondary">Try adjusting your filters or search query.</p>
+                                        <button className="btn-primary mt-4">Clear Filters</button>
                                     </div>
                                 </td>
                             </tr>
@@ -184,15 +312,25 @@ export default function CompaniesPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between pb-10">
-                <p className="text-[11px] font-black text-neutral-muted uppercase tracking-[0.2em]">
-                    Showing <span className="text-foreground">{filteredCompanies.length}</span> results
-                </p>
-                <div className="flex gap-3">
-                    <button className="btn-secondary py-2 px-5 text-[11px] font-black uppercase tracking-widest disabled:opacity-30" disabled>RelPrev</button>
-                    <button className="btn-secondary py-2 px-5 text-[11px] font-black uppercase tracking-widest">RelNext</button>
+            {filteredCompanies.length > 0 && (
+                <div className="flex items-center justify-center gap-6 pt-8">
+                    <button className="text-[13px] text-secondary hover:text-primary transition-editorial disabled:opacity-50" disabled>← Previous</button>
+                    <span className="text-[13px] text-muted">Page 1 of 9</span>
+                    <button className="text-[13px] text-secondary hover:text-primary transition-editorial">Next →</button>
                 </div>
-            </div>
+            )}
+
+            {/* Bulk Actions Bar */}
+            {selectedRows.size > 0 && (
+                <div className="fixed bottom-8 left-[calc(220px+50%)] -translate-x-1/2 bg-[#1A1916] text-white px-4 py-3 rounded-xl shadow-card-md flex items-center gap-6 animate-in slide-in-from-bottom-4 duration-200">
+                    <span className="text-[14px] font-medium">{selectedRows.size} selected</span>
+                    <div className="h-4 w-[1px] bg-[#3A3936]" />
+                    <button className="text-[14px] text-white hover:text-gray-300 transition-editorial">Save to List</button>
+                    <button className="text-[14px] text-white hover:text-gray-300 transition-editorial">Export</button>
+                    <div className="h-4 w-[1px] bg-[#3A3936]" />
+                    <button onClick={() => setSelectedRows(new Set())} className="text-[14px] text-gray-400 hover:text-white transition-editorial">Clear</button>
+                </div>
+            )}
         </div>
     );
 }

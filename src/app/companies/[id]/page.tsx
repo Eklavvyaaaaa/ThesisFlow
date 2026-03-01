@@ -3,29 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-    Building2,
-    Globe,
-    MapPin,
-    Calendar,
-    Users,
-    Zap,
-    Plus,
-    FileText,
     ArrowLeft,
     Check,
-    Save,
     ExternalLink,
     Clock,
-    Sparkles,
-    ShieldCheck,
-    Search,
-    ChevronRight,
-    Loader2,
     Link as LinkIcon,
-    AlertCircle
+    Copy,
+    Download,
+    Zap
 } from 'lucide-react';
-import { MOCK_COMPANIES } from '@/lib/data';
-import { Company, EnrichmentData } from '@/types';
+import { Company, EnrichmentData, CompanyList } from '@/types';
 import { cn } from '@/lib/utils';
 import { getFromStorage, setToStorage, STORAGE_KEYS } from '@/lib/storage';
 
@@ -33,43 +20,114 @@ export default function CompanyProfilePage() {
     const { id } = useParams();
     const router = useRouter();
     const [company, setCompany] = useState<Company | null>(null);
+    const [loadingCompany, setLoadingCompany] = useState(true);
     const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isEnriching, setIsEnriching] = useState(false);
     const [note, setNote] = useState('');
     const [isSaved, setIsSaved] = useState(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'signals' | 'notes'>('overview');
+    const [selectedList, setSelectedList] = useState<string>('default');
+    const [lists, setLists] = useState<CompanyList[]>([]);
+    const [isCopied, setIsCopied] = useState(false);
 
     useEffect(() => {
-        const found = MOCK_COMPANIES.find(c => c.id === id);
-        if (found) {
-            setCompany(found);
-            const cached = getFromStorage<EnrichmentData | null>(`${STORAGE_KEYS.CACHED_ENRICHMENT_PREFIX}${id}`, null);
-            if (cached) setEnrichment(cached);
-            const savedNote = getFromStorage<string>(`${STORAGE_KEYS.NOTES_PREFIX}${id}`, '');
-            if (savedNote) setNote(savedNote);
+        // Hydrate dynamic lists on mount
+        const savedLists = getFromStorage<CompanyList[]>(STORAGE_KEYS.LISTS, []) || [];
+        setLists(savedLists);
+    }, []);
+
+    useEffect(() => {
+        if (!id) return;
+        // Dynamically toggle the "Saved" checkmark state when changing the pipeline dropdown
+        if (selectedList === 'default') {
             const savedList = getFromStorage<string[]>(STORAGE_KEYS.SAVED_COMPANIES, []) || [];
             setIsSaved(savedList.includes(id as string));
+        } else {
+            const allLists = getFromStorage<CompanyList[]>(STORAGE_KEYS.LISTS, []) || [];
+            const currentList = allLists.find(l => l.id === selectedList);
+            setIsSaved(currentList ? currentList.companyIds.includes(id as string) : false);
         }
+    }, [selectedList, id]);
+
+    useEffect(() => {
+        const fetchCompany = async () => {
+            setLoadingCompany(true);
+            try {
+                const res = await fetch('/api/companies');
+                const data = await res.json();
+                if (data.companies) {
+                    const found = data.companies.find((c: Company) => String(c.id) === String(id));
+                    if (found) {
+                        setCompany(found);
+                        const cached = getFromStorage<EnrichmentData | null>(`${STORAGE_KEYS.CACHED_ENRICHMENT_PREFIX}${id}`, null);
+                        if (cached) setEnrichment(cached);
+                        const savedNote = getFromStorage<string>(`${STORAGE_KEYS.NOTES_PREFIX}${id}`, '');
+                        if (savedNote) setNote(savedNote);
+                        const savedList = getFromStorage<string[]>(STORAGE_KEYS.SAVED_COMPANIES, []) || [];
+                        if (selectedList === 'default') {
+                            setIsSaved(savedList.includes(id as string));
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoadingCompany(false);
+            }
+        };
+        fetchCompany();
     }, [id]);
 
     const handleSaveNote = () => {
+        if (!note.trim()) return;
         setIsSaving(true);
         setTimeout(() => {
             setToStorage(`${STORAGE_KEYS.NOTES_PREFIX}${id}`, note);
             setIsSaving(false);
-        }, 600);
+            setNote('');
+            // Toast logic would go here
+        }, 300);
     };
 
     const toggleSaveCompany = () => {
-        const savedList = getFromStorage<string[]>(STORAGE_KEYS.SAVED_COMPANIES, []) || [];
-        let newList;
-        if (isSaved) {
-            newList = savedList.filter(companyId => companyId !== id);
+        if (selectedList === 'default') {
+            const savedList = getFromStorage<string[]>(STORAGE_KEYS.SAVED_COMPANIES, []) || [];
+            let newList;
+            if (isSaved) {
+                newList = savedList.filter(companyId => companyId !== id);
+            } else {
+                newList = [...savedList, id as string];
+            }
+            setToStorage(STORAGE_KEYS.SAVED_COMPANIES, newList);
+            setIsSaved(!isSaved);
         } else {
-            newList = [...savedList, id as string];
+            const allLists = getFromStorage<CompanyList[]>(STORAGE_KEYS.LISTS, []) || [];
+            const listIndex = allLists.findIndex(l => l.id === selectedList);
+            if (listIndex >= 0) {
+                const currentList = allLists[listIndex];
+                if (isSaved) {
+                    currentList.companyIds = currentList.companyIds.filter(companyId => companyId !== id);
+                } else {
+                    currentList.companyIds.push(id as string);
+                }
+                allLists[listIndex] = currentList;
+                setToStorage(STORAGE_KEYS.LISTS, allLists);
+                setLists(allLists);
+                setIsSaved(!isSaved);
+            }
         }
-        setToStorage(STORAGE_KEYS.SAVED_COMPANIES, newList);
-        setIsSaved(!isSaved);
+    };
+
+    const handleCopyUrl = async () => {
+        if (!company?.website) return;
+        try {
+            await navigator.clipboard.writeText(company.website);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy', err);
+        }
     };
 
     const handleEnrich = async () => {
@@ -80,9 +138,8 @@ export default function CompanyProfilePage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    website: company.website,
-                    companyName: company.name,
-                    companyDescription: company.description
+                    url: company.website,
+                    companyId: company.id
                 })
             });
 
@@ -98,228 +155,371 @@ export default function CompanyProfilePage() {
         }
     };
 
-    if (!company) return (
-        <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
-            <Loader2 className="h-6 w-6 text-neutral-muted animate-spin" />
-            <p className="text-xs font-bold text-neutral-muted uppercase tracking-widest">Locating Entity...</p>
-        </div>
-    );
+    const getScoreColor = (score: number) => {
+        if (score >= 80) return 'text-[var(--color-score-high)]';
+        if (score >= 50) return 'text-[var(--color-score-mid)]';
+        return 'text-[var(--color-score-low)]';
+    };
+
+    if (loadingCompany) {
+        return (
+            <div className="space-y-8 pb-16 flex flex-col items-center justify-center pt-32">
+                <div className="flex gap-2 items-center">
+                    <span className="h-2 w-2 bg-muted rounded-full animate-pulse" />
+                    <span className="h-2 w-2 bg-muted rounded-full animate-pulse delay-75" />
+                    <span className="h-2 w-2 bg-muted rounded-full animate-pulse delay-150" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!company) {
+        return (
+            <div className="space-y-8 pb-16 flex flex-col items-center justify-center pt-32 animate-in fade-in duration-300">
+                <h2 className="font-display italic text-[24px] text-primary mb-2">Company not found</h2>
+                <p className="text-[14px] text-secondary mb-6">The company you're looking for doesn't exist or isn't available.</p>
+                <button
+                    onClick={() => router.push('/companies')}
+                    className="flex items-center gap-2 text-[14px] font-medium text-secondary hover:text-primary transition-editorial bg-white px-5 py-2.5 rounded-xl border border-default shadow-sm hover:border-strong"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Companies
+                </button>
+            </div>
+        );
+    }
+
+    // Helper to generate consistent fake scores since it's not in the mock DB yet
+    // Convert part of the string ID to a number for the mock score calculation
+    const numericIdPart = parseInt(company.id.substring(0, 8), 16) || 1;
+    const mockScore = 40 + (numericIdPart * 17) % 60;
+
+    // Mock signals for the timeline tab based on the original data + some extras
+    const mockSignals = enrichment ? [
+        { type: 'AI', text: enrichment.summary.substring(0, 60) + '...', date: new Date(enrichment.timestamp || Date.now()).toISOString() },
+        ...(enrichment.derivedSignals || []).map((s, i) => ({ type: ['hiring', 'funding', 'product', 'press'][i % 4], text: s, date: new Date(Date.now() - (i + 1) * 86400000).toISOString() }))
+    ] : [
+        { type: 'funding', text: 'Raised new capital round', date: '2024-02-10T00:00:00.000Z' },
+        { type: 'product', text: 'Launched new feature set', date: '2024-01-15T00:00:00.000Z' },
+        { type: 'hiring', text: 'Accelerated engineering hiring', date: '2023-11-20T00:00:00.000Z' }
+    ];
 
     return (
-        <div className="space-y-10">
-            {/* Top Navigation */}
-            <div className="flex items-center justify-between">
-                <button
-                    onClick={() => router.back()}
-                    className="group flex items-center gap-2 text-[11px] font-bold text-neutral-muted hover:text-foreground transition-all uppercase tracking-widest"
-                >
-                    <ArrowLeft className="h-3 w-3" />
-                    Back to Workspace
-                </button>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={toggleSaveCompany}
-                        className={cn(
-                            "btn-secondary flex items-center gap-2 py-1.5",
-                            isSaved && "bg-emerald-50 text-emerald-700 border-emerald-100"
-                        )}
-                    >
-                        {isSaved ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-                        {isSaved ? 'In Pipeline' : 'Track Entity'}
-                    </button>
-                    <button
-                        onClick={handleEnrich}
-                        disabled={isEnriching}
-                        className="btn-primary flex items-center gap-2 py-1.5"
-                    >
-                        {isEnriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-                        AI Research
-                    </button>
-                </div>
-            </div>
+        <div className="space-y-8 pb-16">
+            <button
+                onClick={() => router.back()}
+                className="flex items-center gap-1 text-[13px] font-medium text-secondary hover:text-primary transition-editorial w-max"
+            >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back
+            </button>
 
-            {/* Entity Header */}
-            <div className="flex flex-col md:flex-row gap-8 items-start">
-                <div className="h-20 w-20 rounded-xl bg-neutral-soft border border-neutral-border flex items-center justify-center text-2xl font-bold text-neutral-muted shrink-0">
-                    {company.name[0]}
-                </div>
-                <div className="flex-1 space-y-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">{company.name}</h1>
-                        <span className="badge-lavender">{company.stage}</span>
-                    </div>
-                    <p className="text-[15px] text-neutral-muted leading-relaxed max-w-3xl">
-                        {company.description}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-6 pt-1">
-                        <a href={company.website} target="_blank" className="flex items-center gap-2 text-xs font-bold text-primary-foreground hover:underline">
-                            <LinkIcon className="h-3.5 w-3.5" />
-                            {company.website.replace('https://', '')}
-                        </a>
-                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-muted">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {company.location}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-neutral-muted">
-                            <Building2 className="h-3.5 w-3.5" />
-                            {company.sector}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* 65 / 35 Layout translated to 8/4 Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 items-start gap-12">
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                {/* Insights Section */}
-                <div className="lg:col-span-2 space-y-8">
-                    <div className="flex items-center justify-between border-b border-neutral-border pb-4">
-                        <h2 className="text-xs font-bold uppercase tracking-widest text-foreground flex items-center gap-2">
-                            <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
-                            Venture Intelligence
-                        </h2>
-                        {enrichment && (
-                            <span className="text-[10px] font-bold text-neutral-muted uppercase tracking-widest flex items-center gap-1.5">
-                                <Clock className="h-3 w-3" />
-                                Updated {new Date(enrichment.timestamp).toLocaleDateString()}
-                            </span>
-                        )}
-                    </div>
+                {/* Left Column (Approx 66%) */}
+                <div className="xl:col-span-8 min-w-0 space-y-10">
 
-                    {!enrichment && !isEnriching ? (
-                        <div className="content-card border-dashed border-2 py-16 text-center space-y-4">
-                            <div className="h-12 w-12 rounded-full bg-neutral-soft mx-auto flex items-center justify-center">
-                                <Zap className="h-5 w-5 text-neutral-muted opacity-40" />
+                    {/* Header Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="h-8 w-8 rounded-lg bg-strong flex items-center justify-center font-bold text-white shrink-0 text-sm shadow-card-sm">
+                                    {company.name[0]}
+                                </div>
+                                <h1 className="font-display text-[32px] text-primary tracking-tight leading-none flex items-center gap-3">
+                                    {company.name}
+                                    <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-editorial pt-1">
+                                        <ExternalLink className="h-5 w-5" />
+                                    </a>
+                                </h1>
                             </div>
-                            <div className="space-y-1">
-                                <h3 className="text-sm font-bold text-foreground">Extract Precision Signals</h3>
-                                <p className="text-xs text-neutral-muted max-w-sm mx-auto">Analyze website metadata and technical footprints to generate deep intelligence.</p>
+
+                            {/* Thesis Score Block */}
+                            <div className="flex flex-col items-end">
+                                <span className="font-mono text-[11px] uppercase tracking-wide text-muted">Thesis Match</span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className={cn("font-mono text-[32px] font-bold leading-none tracking-tight", getScoreColor(mockScore))}>
+                                        {mockScore}
+                                    </span>
+                                    <span className="font-mono text-[14px] text-muted">/100</span>
+                                </div>
                             </div>
-                            <button onClick={handleEnrich} className="btn-secondary text-[11px] font-bold px-6">Start Engine</button>
                         </div>
-                    ) : isEnriching ? (
-                        <div className="content-card py-20 flex flex-col items-center justify-center gap-4 border-dashed">
-                            <Loader2 className="h-6 w-6 text-primary-foreground animate-spin" />
-                            <p className="text-[11px] font-bold text-neutral-muted uppercase tracking-widest animate-pulse">Running signal extraction...</p>
+
+                        <p className="text-[15px] font-medium text-secondary max-w-2xl leading-relaxed">
+                            {company.description}
+                        </p>
+
+                        {/* Meta Chips */}
+                        <div className="flex flex-wrap items-center gap-3 pt-2">
+                            {[
+                                { label: 'Stage', val: company.stage },
+                                { label: 'Sector', val: company.sector },
+                                { label: 'HQ', val: company.location }
+                            ].map((meta, i) => (
+                                <div key={i} className="flex items-center px-2.5 py-1.5 rounded-lg border border-default bg-card text-[12px] font-mono shadow-sm">
+                                    <span className="text-muted mr-2">{meta.label}</span>
+                                    <span className="text-primary font-medium">{meta.val}</span>
+                                </div>
+                            ))}
                         </div>
-                    ) : (enrichment && (
-                        <div className="space-y-8">
-                            <div className="content-card bg-primary/30 border-primary-border">
-                                <p className="text-[15px] font-medium text-foreground leading-relaxed italic">
-                                    "{enrichment.summary}"
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-6 border-b border-default">
+                            {(['overview', 'signals', 'notes'] as const).map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={cn(
+                                        "pb-3 text-[14px] font-medium capitalize transition-editorial relative",
+                                        activeTab === tab ? "text-primary" : "text-muted hover:text-secondary"
+                                    )}
+                                >
+                                    {tab}
+                                    {activeTab === tab && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Contents */}
+                        <div className="min-h-[300px]">
+
+                            {activeTab === 'overview' && (
+                                <div className="space-y-8 animate-in fade-in duration-300">
+                                    <div className="space-y-3 lg:pr-12">
+                                        <p className="text-[15px] text-primary leading-[1.7]">
+                                            {company.name} operates in the {company.sector} sector, primarily focused on scaling their {company.stage} operations. Their recent traction indicates strong product-market fit within the {company.location} tech ecosystem.
+                                            {enrichment && ` As analyzed recently, ${enrichment.summary.toLowerCase()}`}
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h3 className="font-display italic text-[22px] text-primary">Why it matches</h3>
+                                        <ul className="space-y-3">
+                                            {[
+                                                `High conviction in ${company.sector} infrastructure`,
+                                                `${company.stage} valuation aligns with Fund II targets`,
+                                                `Strong founder background (signal intent)`,
+                                                `${company.location} is a priority geo`
+                                            ].map((point, i) => (
+                                                <li key={i} className="flex items-start gap-3">
+                                                    <Check className="h-5 w-5 text-accent shrink-0 mt-[1px]" />
+                                                    <span className="text-[15px] text-secondary leading-relaxed">{point}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'signals' && (
+                                <div className="space-y-0 relative animate-in fade-in duration-300">
+                                    <div className="absolute left-[7px] top-2 bottom-2 w-[1px] bg-border-strong" />
+                                    {mockSignals.map((signal, i) => {
+                                        const colorMap: Record<string, string> = {
+                                            hiring: 'bg-[var(--color-accent)]',
+                                            funding: 'bg-[var(--color-amber)]',
+                                            product: 'bg-[#2563EB]', // Specific blue requested
+                                            press: 'bg-[var(--color-text-muted)]',
+                                            AI: 'bg-[var(--color-accent)]'
+                                        };
+                                        const bgColor = colorMap[signal.type] || colorMap.press;
+
+                                        return (
+                                            <div key={i} className="flex items-start gap-5 py-4 relative group">
+                                                <div className={cn("h-[15px] w-[15px] rounded-full border-2 border-bg-card shrink-0 mt-[3px] relative z-10", bgColor)} />
+                                                <div className="flex flex-col gap-1 w-full">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[14px] font-medium text-primary">{signal.text}</span>
+                                                    </div>
+                                                    <span className="font-mono text-[12px] text-muted">
+                                                        {new Date(signal.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+
+                            {activeTab === 'notes' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <div>
+                                        <textarea
+                                            value={note}
+                                            onChange={(e) => setNote(e.target.value)}
+                                            placeholder="Add a note..."
+                                            className="w-full bg-transparent border-none text-[15px] text-primary placeholder:text-muted focus:ring-0 resize-y min-h-[100px] font-sans"
+                                        />
+                                        <div className="flex justify-end pt-2 border-t border-default">
+                                            <button
+                                                onClick={handleSaveNote}
+                                                disabled={isSaving || !note.trim()}
+                                                className="btn-primary disabled:opacity-50"
+                                            >
+                                                {isSaving ? 'Saving...' : 'Save Note'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {getFromStorage<string>(`${STORAGE_KEYS.NOTES_PREFIX}${id}`, '') && (
+                                        <div className="p-5 rounded-xl border border-default bg-card shadow-sm">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-[13px] font-semibold text-primary">Me</span>
+                                                <span className="font-mono text-[11px] text-muted">Saved note</span>
+                                            </div>
+                                            <p className="text-[14px] text-secondary whitespace-pre-wrap leading-relaxed">
+                                                {getFromStorage<string>(`${STORAGE_KEYS.NOTES_PREFIX}${id}`, '')}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+
+                </div>
+
+                {/* Right Column (Approx 33%) - Sticky Panel */}
+                <div className="xl:col-span-4 space-y-6 sticky top-8">
+
+                    {/* Enrichment Card */}
+                    <div className="border border-default bg-card rounded-xl p-6 shadow-sm">
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="font-display text-[20px] text-primary">Enrichment</h3>
+                            {enrichment && (
+                                <span className="font-mono text-[11px] text-muted flex items-center gap-1">
+                                    <Check className="h-3 w-3 text-accent" /> Done
+                                </span>
+                            )}
+                        </div>
+
+                        {!enrichment && !isEnriching ? (
+                            <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+                                <Zap className="h-8 w-8 text-muted stroke-[1.5]" />
+                                <p className="text-[14px] text-secondary">
+                                    {!company.website ? "Cannot enrich without a valid website source." : "No enrichment data yet"}
                                 </p>
+                                <button
+                                    onClick={handleEnrich}
+                                    disabled={!company.website}
+                                    className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Enrich Company
+                                </button>
                             </div>
+                        ) : isEnriching ? (
+                            <div className="space-y-4 py-2">
+                                <div className="h-3 bg-subtle rounded-full w-full animate-pulse" />
+                                <div className="h-3 bg-subtle rounded-full w-[90%] animate-pulse" />
+                                <div className="h-3 bg-subtle rounded-full w-[75%] animate-pulse" />
+                            </div>
+                        ) : (
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="space-y-2">
+                                    <h4 className="font-mono text-[11px] uppercase tracking-wide text-muted">Summary</h4>
+                                    <p className="text-[13px] text-primary leading-relaxed">
+                                        {enrichment?.summary}
+                                    </p>
+                                </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-6">
-                                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-muted">Core Thesis</h3>
-                                    <ul className="space-y-3">
-                                        {enrichment.whatTheyDo.map((item, i) => (
-                                            <li key={i} className="flex gap-3 text-xs text-neutral-muted leading-relaxed">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-primary-border shrink-0 mt-1.5" />
-                                                {item}
+                                <div className="space-y-2">
+                                    <h4 className="font-mono text-[11px] uppercase tracking-wide text-muted">What They Do</h4>
+                                    <ul className="space-y-1.5 pt-1">
+                                        {enrichment?.whatTheyDo.map((item, i) => (
+                                            <li key={i} className="text-[13px] text-secondary flex items-start gap-2 leading-relaxed">
+                                                <span className="text-muted mt-0.5">•</span> {item}
                                             </li>
                                         ))}
                                     </ul>
                                 </div>
-                                <div className="space-y-6">
-                                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-muted">Proprietary Signals</h3>
-                                    <div className="space-y-2">
-                                        {enrichment.derivedSignals.map((signal, i) => (
-                                            <div key={i} className="flex items-center justify-between bg-white border border-neutral-border p-3 rounded-lg group hover:border-primary-border transition-all">
-                                                <span className="text-xs font-bold text-foreground">{signal}</span>
-                                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="font-mono text-[11px] uppercase tracking-wide text-muted">Keywords</h4>
+                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                        {enrichment?.keywords.map(tag => (
+                                            <span key={tag} className="px-2 py-1 border border-default rounded-md text-[11px] font-mono text-secondary bg-subtle">
+                                                {tag}
+                                            </span>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-muted">Workspace Keywords</h3>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {enrichment.keywords.map((tag, i) => (
-                                        <span key={i} className="bg-neutral-soft text-[10px] font-bold text-neutral-muted px-2 py-1 rounded border border-neutral-border group hover:border-primary-border hover:bg-white transition-all cursor-default">
-                                            {tag}
-                                        </span>
-                                    ))}
+                                <div className="space-y-2 pt-2 border-t border-default">
+                                    <h4 className="font-mono text-[11px] uppercase tracking-wide text-muted">Sources</h4>
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <LinkIcon className="h-3 w-3 text-muted" />
+                                        <a href={company.website} target="_blank" className="font-mono text-[11px] text-accent hover:underline truncate">
+                                            {company.website}
+                                        </a>
+                                    </div>
+                                    <div className="font-mono text-[10px] text-muted">
+                                        Scraped {new Date(enrichment!.timestamp || Date.now()).toLocaleTimeString()}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Internal Side Panel */}
-                <div className="space-y-10">
-                    <div className="space-y-6">
-                        <h2 className="text-xs font-bold uppercase tracking-widest text-foreground">Operational Data</h2>
-                        <div className="content-card p-0 divide-y divide-neutral-border overflow-hidden">
-                            <div className="p-4 flex items-center justify-between">
-                                <span className="text-xs text-neutral-muted flex items-center gap-2">
-                                    <Users className="h-3.5 w-3.5" />
-                                    Headcount
-                                </span>
-                                <span className="text-xs font-bold text-foreground">50-100</span>
-                            </div>
-                            <div className="p-4 flex items-center justify-between">
-                                <span className="text-xs text-neutral-muted flex items-center gap-2">
-                                    <Calendar className="h-3.5 w-3.5" />
-                                    Founded
-                                </span>
-                                <span className="text-xs font-bold text-foreground">2021</span>
-                            </div>
-                            <div className="p-4 flex items-center justify-between">
-                                <span className="text-xs text-neutral-muted flex items-center gap-2">
-                                    <ShieldCheck className="h-3.5 w-3.5" />
-                                    Compliance
-                                </span>
-                                <span className="text-xs font-bold text-emerald-600">Verified</span>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xs font-bold uppercase tracking-widest text-foreground">Research Diary</h2>
-                            <FileText className="h-3 w-3 text-neutral-muted" />
-                        </div>
+                    {/* Save to List Card */}
+                    <div className="border border-default bg-card rounded-xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-display text-[20px] text-primary">Save to List</h3>
                         <div className="space-y-3">
-                            <textarea
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                placeholder="Add investment thesis or team feedback..."
-                                className="input-calm w-full min-h-[200px] py-4 leading-relaxed resize-none"
-                            />
-                            <button
-                                onClick={handleSaveNote}
-                                disabled={isSaving}
-                                className="btn-primary w-full flex items-center justify-center gap-2"
+                            <select
+                                value={selectedList}
+                                onChange={(e) => setSelectedList(e.target.value)}
+                                className="input-editorial w-full"
                             >
-                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                                {isSaving ? 'Synching...' : 'Commit Notes'}
+                                <option value="default">Default Pipeline</option>
+                                {lists.map(list => (
+                                    <option key={list.id} value={list.id}>{list.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={toggleSaveCompany}
+                                className={cn(
+                                    "w-full flex items-center justify-center gap-2 py-2 rounded-lg text-[14px] font-medium transition-editorial border",
+                                    isSaved
+                                        ? "bg-bg-subtle text-primary border-default"
+                                        : "bg-primary text-white border-primary hover:bg-black"
+                                )}
+                            >
+                                {isSaved ? (
+                                    <><Check className="h-4 w-4 text-accent" /> Saved to List</>
+                                ) : (
+                                    'Save'
+                                )}
                             </button>
                         </div>
                     </div>
+
+                    {/* Actions Card */}
+                    <div className="border border-default bg-card rounded-xl shadow-sm overflow-hidden text-[14px] text-primary">
+                        <button
+                            onClick={handleCopyUrl}
+                            className="w-full flex items-center justify-between px-6 py-3.5 border-b border-default hover:bg-subtle transition-editorial"
+                        >
+                            <span className="flex items-center gap-2">
+                                {isCopied ? <Check className="h-4 w-4 text-accent" /> : <Copy className="h-4 w-4 text-muted" />}
+                                {isCopied ? 'Copied URL!' : 'Copy URL'}
+                            </span>
+                        </button>
+                        <button className="w-full flex items-center justify-between px-6 py-3.5 border-b border-default hover:bg-subtle transition-editorial group">
+                            <span className="flex items-center gap-2"><Download className="h-4 w-4 text-muted" /> Export JSON</span>
+                        </button>
+                        <button disabled className="w-full flex items-center justify-between px-6 py-3.5 bg-subtle text-muted cursor-not-allowed">
+                            <span className="flex items-center gap-2"><ExternalLink className="h-4 w-4 text-muted" /> Share</span>
+                            <span className="font-mono text-[10px] uppercase tracking-wide">Coming soon</span>
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </div>
     );
-}
-
-function CheckCircle2(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-            <path d="m9 12 2 2 4-4" />
-        </svg>
-    )
 }
