@@ -30,6 +30,7 @@ export default function CompanyProfilePage() {
     const [selectedList, setSelectedList] = useState<string>('default');
     const [lists, setLists] = useState<CompanyList[]>([]);
     const [isCopied, setIsCopied] = useState(false);
+    const [enrichStatus, setEnrichStatus] = useState<'idle' | 'loading' | 'success' | 'cached' | 'error'>('idle');
 
     useEffect(() => {
         // Hydrate dynamic lists on mount
@@ -61,7 +62,10 @@ export default function CompanyProfilePage() {
                     if (found) {
                         setCompany(found);
                         const cached = getFromStorage<EnrichmentData | null>(`${STORAGE_KEYS.CACHED_ENRICHMENT_PREFIX}${id}`, null);
-                        if (cached) setEnrichment(cached);
+                        if (cached) {
+                            setEnrichment(cached);
+                            setEnrichStatus('cached');
+                        }
                         const savedNote = getFromStorage<string>(`${STORAGE_KEYS.NOTES_PREFIX}${id}`, '');
                         if (savedNote) setNote(savedNote);
                         const savedList = getFromStorage<string[]>(STORAGE_KEYS.SAVED_COMPANIES, []) || [];
@@ -133,6 +137,7 @@ export default function CompanyProfilePage() {
     const handleEnrich = async () => {
         if (!company) return;
         setIsEnriching(true);
+        setEnrichStatus('loading');
         try {
             const resp = await fetch('/api/enrich', {
                 method: 'POST',
@@ -148,8 +153,10 @@ export default function CompanyProfilePage() {
 
             setEnrichment(data);
             setToStorage(`${STORAGE_KEYS.CACHED_ENRICHMENT_PREFIX}${id}`, data);
+            setEnrichStatus('success');
         } catch (err) {
             console.error(err);
+            setEnrichStatus('error');
         } finally {
             setIsEnriching(false);
         }
@@ -199,9 +206,9 @@ export default function CompanyProfilePage() {
         { type: 'AI', text: enrichment.summary.substring(0, 60) + '...', date: new Date(enrichment.timestamp || Date.now()).toISOString() },
         ...(enrichment.derivedSignals || []).map((s, i) => ({ type: ['hiring', 'funding', 'product', 'press'][i % 4], text: s, date: new Date(Date.now() - (i + 1) * 86400000).toISOString() }))
     ] : [
-        { type: 'funding', text: 'Raised new capital round', date: '2024-02-10T00:00:00.000Z' },
-        { type: 'product', text: 'Launched new feature set', date: '2024-01-15T00:00:00.000Z' },
-        { type: 'hiring', text: 'Accelerated engineering hiring', date: '2023-11-20T00:00:00.000Z' }
+        { type: 'press', text: 'Blog post detected: "Scaling Infrastructure"', date: '2024-02-10T00:00:00.000Z' },
+        { type: 'product', text: 'New feature launched', date: '2024-01-15T00:00:00.000Z' },
+        { type: 'hiring', text: 'Hiring spike (Engineering)', date: '2023-11-20T00:00:00.000Z' }
     ];
 
     return (
@@ -244,6 +251,9 @@ export default function CompanyProfilePage() {
                                     </span>
                                     <span className="font-mono text-[14px] text-muted">/100</span>
                                 </div>
+                                <span className="font-mono text-[10px] text-muted mt-1.5 px-2 py-0.5 rounded border border-default bg-subtle">
+                                    Match score: {mockScore}% — {(mockScore % 3) + 2} thesis keywords matched
+                                </span>
                             </div>
                         </div>
 
@@ -299,20 +309,38 @@ export default function CompanyProfilePage() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <h3 className="font-display italic text-[22px] text-primary">Why it matches</h3>
-                                        <ul className="space-y-3">
+                                        <h3 className="font-display italic text-[22px] text-primary">Why this matches your thesis</h3>
+                                        <div className="space-y-3">
                                             {[
-                                                `High conviction in ${company.sector} infrastructure`,
-                                                `${company.stage} valuation aligns with Fund II targets`,
-                                                `Strong founder background (signal intent)`,
-                                                `${company.location} is a priority geo`
+                                                { text: `High conviction in ${company.sector} infrastructure`, keywords: [company.sector, 'infrastructure'], weight: 'High' },
+                                                { text: `${company.stage} valuation aligns with Fund II targets`, keywords: [company.stage, 'Fund II'], weight: 'Medium' },
+                                                { text: `Strong founder background (signal intent)`, keywords: ['founder bias'], weight: 'High' },
+                                                { text: `${company.location} is a priority geo`, keywords: [company.location], weight: 'Low' }
                                             ].map((point, i) => (
-                                                <li key={i} className="flex items-start gap-3">
-                                                    <Check className="h-5 w-5 text-accent shrink-0 mt-[1px]" />
-                                                    <span className="text-[15px] text-secondary leading-relaxed">{point}</span>
-                                                </li>
+                                                <div key={i} className="flex flex-col gap-2 p-3.5 rounded-lg border border-default bg-card shadow-sm">
+                                                    <div className="flex items-start gap-3">
+                                                        <Check className="h-4 w-4 text-accent shrink-0 mt-[2px]" />
+                                                        <span className="text-[14px] text-secondary leading-relaxed">{point.text}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between pl-7 border-t border-default pt-2 mt-1">
+                                                        <div className="flex gap-1.5 flex-wrap">
+                                                            {point.keywords.map(kw => (
+                                                                <span key={kw} className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded text-muted bg-subtle border border-default">
+                                                                    {kw}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        <span className="text-[10px] uppercase font-mono text-muted flex items-center gap-1">
+                                                            Weight: <span className={cn(
+                                                                point.weight === 'High' ? 'text-[var(--color-score-high)]' :
+                                                                    point.weight === 'Medium' ? 'text-[var(--color-score-mid)]' :
+                                                                        'text-[var(--color-score-low)]'
+                                                            )}>{point.weight}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             ))}
-                                        </ul>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -392,34 +420,44 @@ export default function CompanyProfilePage() {
                     <div className="border border-default bg-card rounded-xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="font-display text-[20px] text-primary">Enrichment</h3>
-                            {enrichment && (
+                            {enrichStatus === 'success' && (
                                 <span className="font-mono text-[11px] text-muted flex items-center gap-1">
-                                    <Check className="h-3 w-3 text-accent" /> Done
+                                    <Check className="h-3 w-3 text-accent" /> Success
+                                </span>
+                            )}
+                            {enrichStatus === 'cached' && (
+                                <span className="font-mono text-[11px] text-muted flex items-center gap-1">
+                                    <Clock className="h-3 w-3 text-muted" /> Cached
+                                </span>
+                            )}
+                            {enrichStatus === 'error' && (
+                                <span className="font-mono text-[11px] text-[var(--color-score-low)] flex items-center gap-1">
+                                    <Zap className="h-3 w-3" /> Failed
                                 </span>
                             )}
                         </div>
 
-                        {!enrichment && !isEnriching ? (
+                        {enrichStatus === 'idle' || enrichStatus === 'error' ? (
                             <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
-                                <Zap className="h-8 w-8 text-muted stroke-[1.5]" />
+                                <Zap className={cn("h-8 w-8 stroke-[1.5]", enrichStatus === 'error' ? "text-[var(--color-score-low)]" : "text-muted")} />
                                 <p className="text-[14px] text-secondary">
-                                    {!company.website ? "Cannot enrich without a valid website source." : "No enrichment data yet"}
+                                    {enrichStatus === 'error' ? "Enrichment pipeline failed." : (!company.website ? "Cannot enrich without a valid website source." : "No enrichment data yet")}
                                 </p>
                                 <button
                                     onClick={handleEnrich}
                                     disabled={!company.website}
                                     className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Enrich Company
+                                    {enrichStatus === 'error' ? "Retry Enrichment" : "Enrich Company"}
                                 </button>
                             </div>
-                        ) : isEnriching ? (
+                        ) : enrichStatus === 'loading' ? (
                             <div className="space-y-4 py-2">
                                 <div className="h-3 bg-subtle rounded-full w-full animate-pulse" />
                                 <div className="h-3 bg-subtle rounded-full w-[90%] animate-pulse" />
                                 <div className="h-3 bg-subtle rounded-full w-[75%] animate-pulse" />
                             </div>
-                        ) : (
+                        ) : enrichment ? (
                             <div className="space-y-6 animate-in fade-in duration-300">
                                 <div className="space-y-2">
                                     <h4 className="font-mono text-[11px] uppercase tracking-wide text-muted">Summary</h4>
@@ -463,7 +501,7 @@ export default function CompanyProfilePage() {
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
 
                     {/* Save to List Card */}
